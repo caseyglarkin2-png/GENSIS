@@ -30,3 +30,4 @@ test-results/
 # PDF outputs (gitignore generated PDFs in dev)
 *.pdf
 !docs/*.pdf
+.vercel

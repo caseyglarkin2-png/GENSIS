@@ -11,7 +11,22 @@ const prisma = new PrismaClient();
 async function main() {
   console.log('🌱 Seeding database...');
 
-  // 1. Create admin user
+  // 1. Create organization first (required for multi-tenant)
+  const org = await prisma.organization.upsert({
+    where: { id: '00000000-0000-0000-0000-000000000010' },
+    update: {},
+    create: {
+      id: '00000000-0000-0000-0000-000000000010',
+      name: 'Freightroll Platform',
+      type: 'PLATFORM_ADMIN',
+      planTier: 'enterprise',
+      isActive: true,
+    },
+  });
+
+  console.log('✅ Created organization:', org.name);
+
+  // 2. Create admin user
   const admin = await prisma.user.upsert({
     where: { email: 'admin@facilitycommand.com' },
     update: {},
@@ -19,15 +34,34 @@ async function main() {
       id: '00000000-0000-0000-0000-000000000001',
       email: 'admin@facilitycommand.com',
       name: 'Admin User',
-      role: 'admin',
     },
   });
 
   console.log('✅ Created admin user:', admin.email);
 
-  // 2. Create sample network
+  // 3. Link user to organization
+  await prisma.organizationUser.upsert({
+    where: {
+      organizationId_userId: {
+        organizationId: org.id,
+        userId: admin.id,
+      },
+    },
+    update: {},
+    create: {
+      organizationId: org.id,
+      userId: admin.id,
+      role: 'PLATFORM_ADMIN',
+      joinedAt: new Date(),
+    },
+  });
+
+  console.log('✅ Linked admin to organization');
+
+  // 4. Create sample network
   const network = await prisma.network.create({
     data: {
+      organizationId: org.id,
       name: 'Primo Brands (Sample)',
       description: 'Sample beverage distributor network with 5 facilities for testing',
       customerType: 'shipper',
@@ -37,7 +71,7 @@ async function main() {
 
   console.log('✅ Created network:', network.name);
 
-  // 3. Create ROI assumptions
+  // 5. Create ROI assumptions
   const defaultAssumptions: ROIAssumptions = {
     currency: 'USD',
     globalAssumptions: {
@@ -90,7 +124,7 @@ async function main() {
 
   console.log('✅ Created ROI assumptions v1.0.0');
 
-  // 4. Create sample facilities with geometry
+  // 6. Create sample facilities with geometry
   const facilities = [
     {
       name: 'Dallas Distribution Center',

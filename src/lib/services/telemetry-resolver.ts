@@ -266,10 +266,13 @@ export class TelemetryResolver {
         ? this.pixelToWorld(detection.boundingBox, calibration)
         : this.estimateWorldPosition(detection.boundingBox, frame.resolution);
       
+      // Map detection class to asset type (car -> unknown)
+      const assetType: TrackedAsset['type'] = detection.class === 'car' ? 'unknown' : detection.class;
+      
       // Find or create tracked asset
       const asset = this.findOrCreateAsset(
         detection.trackId ?? `vision-${frame.cameraId}-${detection.id}`,
-        detection.class,
+        assetType,
         worldPos,
         'vision'
       );
@@ -302,10 +305,13 @@ export class TelemetryResolver {
       // Update tag last seen
       tag.lastSeen = reading.timestamp;
       
+      // Map UWB asset type to tracked asset type (personnel -> person)
+      const assetType: TrackedAsset['type'] = tag.assetType === 'personnel' ? 'person' : tag.assetType;
+      
       // Find or create tracked asset
       const asset = this.findOrCreateAsset(
         tag.assetId,
-        tag.assetType,
+        assetType,
         reading.position,
         'uwb'
       );

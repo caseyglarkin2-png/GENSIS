@@ -91,6 +91,7 @@ export async function POST(request: Request) {
       data: {
         name,
         description,
+        organizationId: '00000000-0000-0000-0000-000000000010', // TODO: Get from auth session
         createdBy: '00000000-0000-0000-0000-000000000001', // TODO: Get from auth session
       },
     });

@@ -16,6 +16,8 @@ type Params = {
 export async function GET(request: Request, { params }: Params) {
   try {
     const { id: networkId } = params;
+    const { searchParams } = new URL(request.url);
+    const search = searchParams.get('search');
 
     // Verify network exists
     const network = await prisma.network.findUnique({
@@ -29,11 +31,25 @@ export async function GET(request: Request, { params }: Params) {
       );
     }
 
+    // Build search filter
+    const searchFilter = search
+      ? {
+          OR: [
+            { name: { contains: search, mode: 'insensitive' as const } },
+            { address: { contains: search, mode: 'insensitive' as const } },
+            { city: { contains: search, mode: 'insensitive' as const } },
+            { state: { contains: search, mode: 'insensitive' as const } },
+            { zipCode: { contains: search, mode: 'insensitive' as const } },
+          ],
+        }
+      : {};
+
     // Fetch facilities
     const facilities = await prisma.facility.findMany({
       where: {
         networkId: networkId,
         deletedAt: null,
+        ...searchFilter,
       },
       include: {
         metrics: true,

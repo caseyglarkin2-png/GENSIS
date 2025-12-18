@@ -19,6 +19,7 @@ export interface FacilityMapData {
   address: string;
   city: string;
   state: string;
+  zipCode: string;
   centroidLng: number | null;
   centroidLat: number | null;
   verificationStatus: 'UNVERIFIED' | 'PENDING' | 'VERIFIED' | 'NEEDS_REVIEW';

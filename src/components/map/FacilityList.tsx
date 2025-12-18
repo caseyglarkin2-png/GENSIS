@@ -51,7 +51,7 @@ export default function FacilityList({
   const filteredFacilities = useMemo(() => {
     let filtered = facilities;
 
-    // Search filter
+    // Search filter - includes address, city, state, zip code
     if (search) {
       const searchLower = search.toLowerCase();
       filtered = filtered.filter(
@@ -59,6 +59,7 @@ export default function FacilityList({
           f.name.toLowerCase().includes(searchLower) ||
           f.city.toLowerCase().includes(searchLower) ||
           f.state.toLowerCase().includes(searchLower) ||
+          f.zipCode.toLowerCase().includes(searchLower) ||
           f.address.toLowerCase().includes(searchLower)
       );
     }
@@ -105,7 +106,7 @@ export default function FacilityList({
         <div className="relative">
           <input
             type="text"
-            placeholder="Search facilities..."
+            placeholder="Search by name, address, city, state, or zip..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full px-4 py-2 pl-10 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -124,6 +125,11 @@ export default function FacilityList({
             />
           </svg>
         </div>
+        {search && (
+          <p className="mt-2 text-xs text-gray-500">
+            {filteredFacilities.length} {filteredFacilities.length === 1 ? 'result' : 'results'} found
+          </p>
+        )}
       </div>
 
       {/* Filters */}
@@ -190,8 +196,13 @@ export default function FacilityList({
                       <h3 className="font-medium text-gray-900 truncate">
                         {facility.name}
                       </h3>
+                      {facility.address && (
+                        <p className="text-xs text-gray-500 truncate">
+                          {facility.address}
+                        </p>
+                      )}
                       <p className="text-sm text-gray-500 truncate">
-                        {facility.city}, {facility.state}
+                        {facility.city}, {facility.state} {facility.zipCode}
                       </p>
                     </div>
                     <span
