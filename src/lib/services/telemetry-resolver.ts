@@ -88,7 +88,7 @@ export interface CameraCalibration {
 
 export interface UWBTag {
   tagId: string;
-  assetType: 'truck' | 'trailer' | 'forklift' | 'personnel';
+  assetType: 'truck' | 'trailer' | 'forklift' | 'person';
   assetId: string;      // Foreign key to asset record
   batteryPercent: number;
   lastSeen: number;     // Unix ms
@@ -127,7 +127,7 @@ export interface UWBFrame {
 
 export interface TrackedAsset {
   id: string;
-  type: 'truck' | 'trailer' | 'forklift' | 'person' | 'unknown';
+  type: 'truck' | 'trailer' | 'forklift' | 'person' | 'car' | 'unknown';
   
   // Identity
   licensePlate?: string;
@@ -818,6 +818,7 @@ export class TelemetryResolver {
       trailer: 0,
       forklift: 0,
       person: 0,
+      car: 0,
       unknown: 0,
     };
     

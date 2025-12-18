@@ -19,25 +19,60 @@ async function main() {
       id: '00000000-0000-0000-0000-000000000001',
       email: 'admin@facilitycommand.com',
       name: 'Admin User',
-      role: 'admin',
     },
   });
 
   console.log('✅ Created admin user:', admin.email);
 
-  // 2. Create sample network
+  // 2. Create platform admin organization (Freightroll)
+  const freightroll = await prisma.organization.upsert({
+    where: { id: '00000000-0000-0000-0000-000000000010' },
+    update: {},
+    create: {
+      id: '00000000-0000-0000-0000-000000000010',
+      name: 'Freightroll',
+      type: 'PLATFORM_ADMIN',
+      planTier: 'enterprise',
+      features: ['ai_insights', 'templates', 'api_access', 'white_label'],
+      isActive: true,
+    },
+  });
+
+  console.log('✅ Created platform admin org:', freightroll.name);
+
+  // 3. Link admin user to organization
+  await prisma.organizationUser.upsert({
+    where: {
+      organizationId_userId: {
+        organizationId: freightroll.id,
+        userId: admin.id,
+      },
+    },
+    update: {},
+    create: {
+      organizationId: freightroll.id,
+      userId: admin.id,
+      role: 'PLATFORM_ADMIN',
+      joinedAt: new Date(),
+    },
+  });
+
+  console.log('✅ Linked admin to organization');
+
+  // 4. Create sample network
   const network = await prisma.network.create({
     data: {
       name: 'Primo Brands (Sample)',
       description: 'Sample beverage distributor network with 5 facilities for testing',
       customerType: 'shipper',
+      organizationId: freightroll.id,
       createdBy: admin.id,
     },
   });
 
   console.log('✅ Created network:', network.name);
 
-  // 3. Create ROI assumptions
+  // 5. Create ROI assumptions
   const defaultAssumptions: ROIAssumptions = {
     currency: 'USD',
     globalAssumptions: {
@@ -90,7 +125,7 @@ async function main() {
 
   console.log('✅ Created ROI assumptions v1.0.0');
 
-  // 4. Create sample facilities with geometry
+  // 6. Create sample facilities with geometry
   const facilities = [
     {
       name: 'Dallas Distribution Center',

@@ -106,7 +106,7 @@ export default async function HomePage() {
             🚀 Quick Start
           </h3>
           <ol className="space-y-2 text-sm text-blue-800">
-            <li>1. Create a network (e.g., "Primo Brands")</li>
+            <li>1. Create a network (e.g., &quot;Primo Brands&quot;)</li>
             <li>2. Import facilities via CSV or add manually</li>
             <li>3. Verify geometry on map (centroid + polygon)</li>
             <li>4. Add operational metrics with confidence</li>
