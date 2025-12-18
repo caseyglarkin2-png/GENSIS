@@ -12,17 +12,90 @@ datasource db {
   extensions = [postgis]
 }
 
+// ============================
+// MULTI-TENANT ORGANIZATION MODELS
+// ============================
+
+enum OrganizationType {
+  PLATFORM_ADMIN    // Freightroll
+  CUSTOMER          // Primo, other customers
+  PARTNER           // Integration partners
+  
+  @@map("organization_type")
+}
+
+model Organization {
+  id               String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name             String
+  type             OrganizationType
+  
+  // White-label branding
+  brandName        String?          @map("brand_name")
+  logoUrl          String?          @map("logo_url")
+  primaryColor     String?          @map("primary_color")
+  customDomain     String?          @unique @map("custom_domain")
+  
+  // Business details
+  industry         String?
+  companySize      String?          @map("company_size")
+  contactEmail     String?          @map("contact_email")
+  contactPhone     String?          @map("contact_phone")
+  
+  // Subscription
+  planTier         String           @default("starter") @map("plan_tier") // starter | professional | enterprise
+  maxNetworks      Int?             @map("max_networks")
+  maxFacilities    Int?             @map("max_facilities")
+  maxUsers         Int?             @map("max_users")
+  features         String[]         @default([]) // ai_insights | templates | api_access | white_label
+  
+  // Status
+  isActive         Boolean          @default(true) @map("is_active")
+  trialEndsAt      DateTime?        @map("trial_ends_at")
+  subscriptionEndsAt DateTime?      @map("subscription_ends_at")
+  
+  createdAt        DateTime         @default(now()) @map("created_at")
+  updatedAt        DateTime         @updatedAt @map("updated_at")
+  deletedAt        DateTime?        @map("deleted_at")
+  
+  users            OrganizationUser[]
+  networks         Network[]
+  templates        NetworkTemplate[]
+  insights         AIInsight[]
+  
+  @@map("organizations")
+  @@index([type])
+  @@index([isActive])
+  @@index([deletedAt])
+}
+
+enum UserRole {
+  PLATFORM_ADMIN      // Freightroll super admins
+  ORG_OWNER           // Customer org owner
+  ORG_ADMIN           // Customer org admin
+  NETWORK_MANAGER     // Can manage networks/facilities
+  ANALYST             // Can view and analyze
+  VIEWER              // Read-only access
+  
+  @@map("user_role")
+}
+
 model User {
   id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   email     String   @unique
   name      String
-  role      String   @default("viewer") // admin | network_manager | viewer
+  avatarUrl String?  @map("avatar_url")
+  
+  // Quick onboarding
+  onboardingCompleted Boolean  @default(false) @map("onboarding_completed")
+  onboardingStep      Int      @default(0) @map("onboarding_step")
+  
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
   deletedAt DateTime? @map("deleted_at")
   
-  networks  Network[]
-  auditLogs AuditLog[]
+  organizations OrganizationUser[]
+  networks      Network[]
+  auditLogs     AuditLog[]
   geometryVerifications FacilityGeometryVerification[]
   roiAssumptions RoiAssumption[]
   
@@ -31,21 +104,144 @@ model User {
   @@index([deletedAt])
 }
 
-model Network {
-  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  name         String
-  description  String?  @db.Text
-  customerType String?  @map("customer_type") // shipper | carrier | 3pl | warehouse_network
-  createdBy    String   @map("created_by") @db.Uuid
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
-  deletedAt    DateTime? @map("deleted_at")
+model OrganizationUser {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  userId         String   @map("user_id") @db.Uuid
+  role           UserRole
   
-  creator      User     @relation(fields: [createdBy], references: [id])
-  facilities   Facility[]
+  invitedAt      DateTime? @map("invited_at")
+  joinedAt       DateTime? @map("joined_at")
+  
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+  
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@unique([organizationId, userId])
+  @@map("organization_users")
+  @@index([userId])
+  @@index([role])
+}
+
+// ============================
+// TEMPLATE LIBRARY
+// ============================
+
+model NetworkTemplate {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId  String?  @map("organization_id") @db.Uuid // null = global Freightroll template
+  
+  name            String
+  description     String?  @db.Text
+  industry        String?  // logistics | retail | manufacturing | 3pl
+  icon            String?
+  
+  // Template data
+  facilityTypes   String[] @default([]) @map("facility_types")
+  defaultMetrics  Json     @map("default_metrics")
+  roiDefaults     Json     @map("roi_defaults")
+  
+  // Usage stats
+  timesUsed       Int      @default(0) @map("times_used")
+  isPublic        Boolean  @default(false) @map("is_public")
+  isFeatured      Boolean  @default(false) @map("is_featured")
+  
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+  
+  organization    Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  
+  @@map("network_templates")
+  @@index([industry])
+  @@index([isPublic, isFeatured])
+}
+
+// ============================
+// AI INSIGHTS ENGINE
+// ============================
+
+enum InsightType {
+  ANOMALY         // Unusual patterns detected
+  RECOMMENDATION  // Suggested improvements
+  PREDICTION      // Forecasted trends
+  BENCHMARK       // Performance comparison
+  ALERT           // Urgent attention needed
+  
+  @@map("insight_type")
+}
+
+enum InsightPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+  
+  @@map("insight_priority")
+}
+
+model AIInsight {
+  id              String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId  String          @map("organization_id") @db.Uuid
+  networkId       String?         @map("network_id") @db.Uuid
+  facilityId      String?         @map("facility_id") @db.Uuid
+  
+  type            InsightType
+  priority        InsightPriority
+  
+  title           String
+  description     String          @db.Text
+  recommendation  String?         @db.Text
+  
+  // Supporting data
+  dataPoints      Json?           @map("data_points")
+  confidenceScore Float?          @map("confidence_score")
+  
+  // Actions
+  isDismissed     Boolean         @default(false) @map("is_dismissed")
+  isActionTaken   Boolean         @default(false) @map("is_action_taken")
+  actionNotes     String?         @map("action_notes") @db.Text
+  
+  createdAt       DateTime        @default(now()) @map("created_at")
+  updatedAt       DateTime        @updatedAt @map("updated_at")
+  expiresAt       DateTime?       @map("expires_at")
+  
+  organization    Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  network         Network?        @relation(fields: [networkId], references: [id], onDelete: Cascade)
+  facility        Facility?       @relation(fields: [facilityId], references: [id], onDelete: Cascade)
+  
+  @@map("ai_insights")
+  @@index([organizationId])
+  @@index([networkId])
+  @@index([facilityId])
+  @@index([type, priority])
+  @@index([isDismissed, createdAt])
+}
+
+model Network {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  name           String
+  description    String?  @db.Text
+  customerType   String?  @map("customer_type") // shipper | carrier | 3pl | warehouse_network
+  
+  // Created from template
+  templateId     String?  @map("template_id") @db.Uuid
+  
+  createdBy      String   @map("created_by") @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+  deletedAt      DateTime? @map("deleted_at")
+  
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  creator        User         @relation(fields: [createdBy], references: [id])
+  facilities     Facility[]
   roiAssumptions RoiAssumption[]
+  insights       AIInsight[]
   
   @@map("networks")
+  @@index([organizationId])
   @@index([name])
   @@index([deletedAt])
 }
@@ -66,6 +262,11 @@ model Facility {
   name              String
   facilityCode      String?            @map("facility_code")
   facilityType      String?            @map("facility_type")
+  
+  // Priority Flag (Primo Facilities)
+  isPriority        Boolean            @default(false) @map("is_priority")
+  priorityRank      Int?               @map("priority_rank") // 1-5 tier ranking
+  priorityReason    String?            @map("priority_reason") @db.Text
   
   // Address
   address           String?            @map("address_line1")
@@ -104,12 +305,14 @@ model Facility {
   network           Network            @relation(fields: [networkId], references: [id], onDelete: Cascade)
   metrics           FacilityMetric?
   geometryVerifications FacilityGeometryVerification[]
+  insights          AIInsight[]
   
   @@map("facilities")
   @@index([networkId])
   @@index([name])
   @@index([verificationStatus])
   @@index([deletedAt])
+  @@index([isPriority])
 }
 
 enum MetricSource {

@@ -96,6 +96,9 @@ async function main() {
       name: 'Dallas Distribution Center',
       code: 'DAL-001',
       type: 'dc',
+      isPriority: true,
+      priorityRank: 1,
+      priorityReason: 'Highest volume hub - ideal for Phase 1 pilot deployment',
       address: {
         line1: '2501 N Stemmons Fwy',
         city: 'Dallas',
@@ -117,6 +120,9 @@ async function main() {
       name: 'Houston Warehouse',
       code: 'HOU-001',
       type: 'warehouse',
+      isPriority: true,
+      priorityRank: 3,
+      priorityReason: 'Growing market - strong carrier partner interest',
       address: {
         line1: '8610 Park Ten Blvd',
         city: 'Houston',
@@ -138,6 +144,9 @@ async function main() {
       name: 'Phoenix Terminal',
       code: 'PHX-001',
       type: 'terminal',
+      isPriority: false,
+      priorityRank: null,
+      priorityReason: null,
       address: {
         line1: '4750 W Van Buren St',
         city: 'Phoenix',
@@ -159,6 +168,9 @@ async function main() {
       name: 'Atlanta DC',
       code: 'ATL-001',
       type: 'dc',
+      isPriority: true,
+      priorityRank: 2,
+      priorityReason: 'Southeast hub - critical for East Coast distribution network',
       address: {
         line1: '1000 Distribution Dr',
         city: 'Atlanta',
@@ -180,6 +192,9 @@ async function main() {
       name: 'Chicago Plant',
       code: 'CHI-001',
       type: 'plant',
+      isPriority: false,
+      priorityRank: null,
+      priorityReason: null,
       address: {
         line1: '1550 S Blue Island Ave',
         city: 'Chicago',
@@ -204,15 +219,16 @@ async function main() {
     const facility = await prisma.$queryRawUnsafe<any[]>(`
       INSERT INTO facilities (
         network_id, name, facility_code, facility_type,
+        is_priority, priority_rank, priority_reason,
         address_line1, city, state, zip, country,
         facility_centroid,
         verification_status, verification_confidence_score,
         import_source, geocode_method, geocode_confidence,
         created_at, updated_at
       ) VALUES (
-        $1::uuid, $2, $3, $4, $5, $6, $7, $8, $9,
-        ST_GeomFromGeoJSON($10),
-        $11::verification_status, $12, $13, $14, $15,
+        $1::uuid, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12,
+        ST_GeomFromGeoJSON($13),
+        $14::verification_status, $15, $16, $17, $18,
         NOW(), NOW()
       )
       RETURNING id, name;
@@ -221,6 +237,9 @@ async function main() {
       fac.name,
       fac.code,
       fac.type,
+      fac.isPriority,
+      fac.priorityRank,
+      fac.priorityReason,
       fac.address.line1,
       fac.address.city,
       fac.address.state,
