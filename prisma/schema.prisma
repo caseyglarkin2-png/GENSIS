@@ -1,0 +1,273 @@
+// This is your Prisma schema file
+// Learn more: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  extensions = [postgis]
+}
+
+model User {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email     String   @unique
+  name      String
+  role      String   @default("viewer") // admin | network_manager | viewer
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+  
+  networks  Network[]
+  auditLogs AuditLog[]
+  geometryVerifications FacilityGeometryVerification[]
+  roiAssumptions RoiAssumption[]
+  
+  @@map("users")
+  @@index([email])
+  @@index([deletedAt])
+}
+
+model Network {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name         String
+  description  String?  @db.Text
+  customerType String?  @map("customer_type") // shipper | carrier | 3pl | warehouse_network
+  createdBy    String   @map("created_by") @db.Uuid
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+  deletedAt    DateTime? @map("deleted_at")
+  
+  creator      User     @relation(fields: [createdBy], references: [id])
+  facilities   Facility[]
+  roiAssumptions RoiAssumption[]
+  
+  @@map("networks")
+  @@index([name])
+  @@index([deletedAt])
+}
+
+enum VerificationStatus {
+  UNVERIFIED
+  NEEDS_REVIEW
+  VERIFIED
+  
+  @@map("verification_status")
+}
+
+model Facility {
+  id                String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  networkId         String             @map("network_id") @db.Uuid
+  
+  // Basic Info
+  name              String
+  facilityCode      String?            @map("facility_code")
+  facilityType      String?            @map("facility_type")
+  
+  // Address
+  address           String?            @map("address_line1")
+  addressLine2      String?            @map("address_line2")
+  city              String?
+  state             String?
+  zipCode           String?            @map("zip")
+  country           String?            @default("USA")
+  
+  // Geometry - centroid stored as lat/lng for easy access
+  centroidLat       Float?             @map("centroid_lat")
+  centroidLng       Float?             @map("centroid_lng")
+  polygonWKT        String?            @map("polygon_wkt") @db.Text
+  // PostGIS geometry (used for spatial queries, synced with lat/lng)
+  facilityCentroid  Unsupported("GEOMETRY(Point, 4326)")? @map("facility_centroid")
+  facilityPolygon   Unsupported("GEOMETRY(Polygon, 4326)")? @map("facility_polygon")
+  cannotPolygonReason String?          @map("cannot_polygon_reason") @db.Text
+  
+  // Verification
+  verificationStatus VerificationStatus @default(UNVERIFIED) @map("verification_status")
+  verificationConfidenceScore Int?     @map("verification_confidence_score")
+  lastVerifiedAt    DateTime?          @map("last_verified_at")
+  verifiedByUserId  String?            @map("verified_by_user_id") @db.Uuid
+  
+  // Import metadata
+  importSource      String?            @map("import_source")
+  importBatchId     String?            @map("import_batch_id") @db.Uuid
+  geocodeMethod     String?            @map("geocode_method")
+  geocodeConfidence Float?             @map("geocode_confidence")
+  
+  // Timestamps
+  createdAt         DateTime           @default(now()) @map("created_at")
+  updatedAt         DateTime           @updatedAt @map("updated_at")
+  deletedAt         DateTime?          @map("deleted_at")
+  
+  network           Network            @relation(fields: [networkId], references: [id], onDelete: Cascade)
+  metrics           FacilityMetric?
+  geometryVerifications FacilityGeometryVerification[]
+  
+  @@map("facilities")
+  @@index([networkId])
+  @@index([name])
+  @@index([verificationStatus])
+  @@index([deletedAt])
+}
+
+enum MetricSource {
+  manual
+  import
+  geocoder
+  estimate
+  integration
+  
+  @@map("metric_source")
+}
+
+model FacilityMetric {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  facilityId String   @unique @map("facility_id") @db.Uuid
+  
+  // Infrastructure (all follow pattern: value, confidence, source, last_verified_at, evidence_links)
+  docksCount                          Int?        @map("docks_count")
+  docksCountConfidence                Int?        @map("docks_count_confidence")
+  docksCountSource                    MetricSource? @map("docks_count_source")
+  docksCountLastVerifiedAt            DateTime?   @map("docks_count_last_verified_at")
+  docksCountEvidenceLinks             String[]    @default([]) @map("docks_count_evidence_links")
+  
+  gatesCount                          Int?        @map("gates_count")
+  gatesCountConfidence                Int?        @map("gates_count_confidence")
+  gatesCountSource                    MetricSource? @map("gates_count_source")
+  gatesCountLastVerifiedAt            DateTime?   @map("gates_count_last_verified_at")
+  gatesCountEvidenceLinks             String[]    @default([]) @map("gates_count_evidence_links")
+  
+  yardSpotsCount                      Int?        @map("yard_spots_count")
+  yardSpotsCountConfidence            Int?        @map("yard_spots_count_confidence")
+  yardSpotsCountSource                MetricSource? @map("yard_spots_count_source")
+  yardSpotsCountLastVerifiedAt        DateTime?   @map("yard_spots_count_last_verified_at")
+  yardSpotsCountEvidenceLinks         String[]    @default([]) @map("yard_spots_count_evidence_links")
+  
+  trailersOnYardAvg                   Int?        @map("trailers_on_yard_avg")
+  trailersOnYardAvgConfidence         Int?        @map("trailers_on_yard_avg_confidence")
+  trailersOnYardAvgSource             MetricSource? @map("trailers_on_yard_avg_source")
+  trailersOnYardAvgLastVerifiedAt     DateTime?   @map("trailers_on_yard_avg_last_verified_at")
+  trailersOnYardAvgEvidenceLinks      String[]    @default([]) @map("trailers_on_yard_avg_evidence_links")
+  
+  // Throughput
+  trucksPerDayInbound                 Int?        @map("trucks_per_day_inbound")
+  trucksPerDayInboundConfidence       Int?        @map("trucks_per_day_inbound_confidence")
+  trucksPerDayInboundSource           MetricSource? @map("trucks_per_day_inbound_source")
+  trucksPerDayInboundLastVerifiedAt   DateTime?   @map("trucks_per_day_inbound_last_verified_at")
+  trucksPerDayInboundEvidenceLinks    String[]    @default([]) @map("trucks_per_day_inbound_evidence_links")
+  
+  trucksPerDayOutbound                Int?        @map("trucks_per_day_outbound")
+  trucksPerDayOutboundConfidence      Int?        @map("trucks_per_day_outbound_confidence")
+  trucksPerDayOutboundSource          MetricSource? @map("trucks_per_day_outbound_source")
+  trucksPerDayOutboundLastVerifiedAt  DateTime?   @map("trucks_per_day_outbound_last_verified_at")
+  trucksPerDayOutboundEvidenceLinks   String[]    @default([]) @map("trucks_per_day_outbound_evidence_links")
+  
+  // Performance
+  avgTurnTimeMinutes                  Int?        @map("avg_turn_time_minutes")
+  avgTurnTimeMinutesConfidence        Int?        @map("avg_turn_time_minutes_confidence")
+  avgTurnTimeMinutesSource            MetricSource? @map("avg_turn_time_minutes_source")
+  avgTurnTimeMinutesLastVerifiedAt    DateTime?   @map("avg_turn_time_minutes_last_verified_at")
+  avgTurnTimeMinutesEvidenceLinks     String[]    @default([]) @map("avg_turn_time_minutes_evidence_links")
+  
+  detentionMinutesPerTruck            Int?        @map("detention_minutes_per_truck")
+  detentionMinutesPerTruckConfidence  Int?        @map("detention_minutes_per_truck_confidence")
+  detentionMinutesPerTruckSource      MetricSource? @map("detention_minutes_per_truck_source")
+  detentionMinutesPerTruckLastVerifiedAt DateTime? @map("detention_minutes_per_truck_last_verified_at")
+  detentionMinutesPerTruckEvidenceLinks String[]  @default([]) @map("detention_minutes_per_truck_evidence_links")
+  
+  // Bottlenecks
+  bottlenecks                         String[]    @default([])
+  bottlenecksConfidence               Int?        @map("bottlenecks_confidence")
+  bottlenecksSource                   MetricSource? @map("bottlenecks_source")
+  bottlenecksLastVerifiedAt           DateTime?   @map("bottlenecks_last_verified_at")
+  bottlenecksEvidenceLinks            String[]    @default([]) @map("bottlenecks_evidence_links")
+  
+  createdAt                           DateTime    @default(now()) @map("created_at")
+  updatedAt                           DateTime    @updatedAt @map("updated_at")
+  
+  facility                            Facility    @relation(fields: [facilityId], references: [id], onDelete: Cascade)
+  
+  @@map("facility_metrics")
+}
+
+model FacilityGeometryVerification {
+  id                  String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  facilityId          String   @map("facility_id") @db.Uuid
+  
+  // Geometry snapshot
+  centroidSnapshot    Unsupported("GEOMETRY(Point, 4326)")? @map("centroid_snapshot")
+  polygonSnapshot     Unsupported("GEOMETRY(Polygon, 4326)")? @map("polygon_snapshot")
+  cannotPolygonReason String?  @map("cannot_polygon_reason") @db.Text
+  
+  // Verification details
+  verificationMethod  String   @map("verification_method")
+  confidenceScore     Int      @map("confidence_score")
+  notes               String?  @db.Text
+  
+  // Who/when
+  verifiedByUserId    String   @map("verified_by_user_id") @db.Uuid
+  verifiedAt          DateTime @default(now()) @map("verified_at")
+  
+  facility            Facility @relation(fields: [facilityId], references: [id], onDelete: Cascade)
+  verifiedBy          User     @relation(fields: [verifiedByUserId], references: [id])
+  
+  @@map("facility_geometry_verification")
+  @@index([facilityId])
+  @@index([verifiedAt])
+}
+
+model RoiAssumption {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  networkId       String   @map("network_id") @db.Uuid
+  
+  // Versioning
+  version         String
+  effectiveDate   DateTime @map("effective_date") @db.Date
+  isActive        Boolean  @default(true) @map("is_active")
+  
+  // ROI Parameters (JSONB)
+  assumptionsData Json     @map("assumptions_data")
+  
+  // Metadata
+  createdBy       String   @map("created_by") @db.Uuid
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+  
+  network         Network  @relation(fields: [networkId], references: [id], onDelete: Cascade)
+  creator         User     @relation(fields: [createdBy], references: [id])
+  
+  @@map("roi_assumptions")
+  @@index([networkId])
+  @@index([networkId, isActive])
+}
+
+model AuditLog {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  
+  // What action was taken
+  action      String   @map("action")
+  entityType  String   @map("entity_type")
+  entityId    String   @map("entity_id") @db.Uuid
+  
+  // Change details
+  changes     Json?    @map("changes")
+  metadata    Json?    @map("metadata")
+  
+  // Who/when
+  userId      String?  @map("user_id") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at")
+  
+  // Context
+  ipAddress   String?  @map("ip_address")
+  userAgent   String?  @map("user_agent") @db.Text
+  
+  user        User?    @relation(fields: [userId], references: [id])
+  
+  @@map("audit_logs")
+  @@index([entityType, entityId])
+  @@index([createdAt])
+  @@index([userId])
+  @@index([action])
+}

@@ -1,0 +1,6 @@
+name,facility_code,facility_type,address_line1,city,state,zip,country
+Dallas Distribution Center,DAL-001,dc,2501 N Stemmons Fwy,Dallas,TX,75207,USA
+Houston Warehouse,HOU-001,warehouse,8610 Park Ten Blvd,Houston,TX,77084,USA
+Phoenix Terminal,PHX-001,terminal,4750 W Van Buren St,Phoenix,AZ,85043,USA
+Atlanta DC,ATL-001,dc,1000 Distribution Dr,Atlanta,GA,30336,USA
+Chicago Plant,CHI-001,plant,1550 S Blue Island Ave,Chicago,IL,60608,USA

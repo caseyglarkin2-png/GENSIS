@@ -1,0 +1,32 @@
+node_modules/
+.next/
+dist/
+build/
+.env
+.env.local
+.env.*.local
+*.log
+.DS_Store
+coverage/
+.turbo/
+.vercel/
+prisma/migrations/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Testing
+.jest/
+__snapshots__/
+
+# Playwright
+playwright-report/
+test-results/
+
+# PDF outputs (gitignore generated PDFs in dev)
+*.pdf
+!docs/*.pdf
