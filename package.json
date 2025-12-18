@@ -4,7 +4,8 @@
   "description": "Multi-facility network planning and rollout platform with verified geometry and ROI modeling",
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && next build",
+    "build": "next build",
+    "postinstall": "prisma generate",
     "start": "next start",
     "lint": "next lint",
     "test": "jest",
